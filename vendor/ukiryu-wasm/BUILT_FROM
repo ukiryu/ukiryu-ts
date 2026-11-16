@@ -1,10 +1,10 @@
 {
-  "core_commit": "4827c94c940fe9c0bbf0d37b1e4e6baa487210f9",
+  "core_commit": "739ecd3455a1fdf343f18e48756f71988d0de48f",
   "crate_version": "0.1.0",
   "rust": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
   "wasm_pack": "wasm-pack 0.13.1",
   "wasm_bindgen": "0.2.105",
-  "lock_sha256": "4e5610ee4375a6528bd811c9334cc58b579dfcf691bc0f30a9c4856b8ee581f4",
+  "lock_sha256": "f6d842b693812a5798c13b2b36368d78761253a88e2dfebef3102ead5e8ccdb4",
   "files": {
     ".gitignore": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
     "LICENSE": "ee8bec5a5895a59f9165d84bc7b73c935f8be10c3aa406c7091dcf69befba5e1",
@@ -14,9 +14,9 @@
     "licenses/onigmo/NOTICE": "52cd0e6309055a6e346f5467f7012190ea4441725111e85a12e285090858df45",
     "licenses/onigmo/PROVENANCE": "e93711b7007adc1ede1f5ae5ce32b4b23dc5b2040156028e2fec3f785f07578b",
     "package.json": "e5a06b0b294c04d86a2fd6096980297a40d9e38dd7c39891d20efac4e2edad54",
-    "ukiryu.d.ts": "7d75a7587e942ac7528ec74d9e96bab14e621857f530e9c983b2017603cd284c",
-    "ukiryu.js": "7dffa12b5104681b5b604b6ff0c74be27a138139653027d6a04e6fb46e879079",
-    "ukiryu_bg.wasm": "db596b7a0928813786a6f475000ab60f2747fc51dc75b4ce561cc65f370d0c4a",
-    "ukiryu_bg.wasm.d.ts": "86c5aeb1b555128d8f742d8118695374d0f5b564fc35a7b59c7890d3119ccc71"
+    "ukiryu.d.ts": "45ea67a128ce468d8e7eb4a6f6e7a5d75698973511f2476c29510d24ac2631a5",
+    "ukiryu.js": "c858e692fa843ddf81d7898b1c8803b764dbf47de695499bbfa09a519f272ac7",
+    "ukiryu_bg.wasm": "7a3c8fee69303910c489f47cd97d6bf3e5de7def5e82fe29835797ec92dd498c",
+    "ukiryu_bg.wasm.d.ts": "6e53948089c34a0b931ae7829ee4bee4fb5e0277e78707702b3ab05076de2fc1"
   }
 }

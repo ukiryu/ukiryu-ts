@@ -1,7 +1,5 @@
 /* tslint:disable */
 /* eslint-disable */
-export function abi_version(): number;
-export function core_version(): string;
 /**
  * Process a JSON wire request, returning a JSON wire response.
  *
@@ -10,3 +8,5 @@ export function core_version(): string;
  * available to browser consumers merely by being added to the shared wire.
  */
 export function process(input: string): string;
+export function core_version(): string;
+export function abi_version(): number;

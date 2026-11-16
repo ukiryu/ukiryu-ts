@@ -1,7 +1,5 @@
 /* tslint:disable */
 /* eslint-disable */
-export function abi_version(): number;
-export function core_version(): string;
 /**
  * Process a JSON wire request, returning a JSON wire response.
  *
@@ -10,6 +8,8 @@ export function core_version(): string;
  * available to browser consumers merely by being added to the shared wire.
  */
 export function process(input: string): string;
+export function core_version(): string;
+export function abi_version(): number;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -29,9 +29,9 @@ export interface InitOutput {
   readonly emscripten_memcpy_js: (a: number, b: number, c: number) => void;
   readonly getenv: (a: number) => number;
   readonly __wbindgen_externrefs: WebAssembly.Table;
-  readonly __wbindgen_free_command_export: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc_command_export: (a: number, b: number) => number;
   readonly __wbindgen_realloc_command_export: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_free_command_export: (a: number, b: number, c: number) => void;
   readonly __wbindgen_start: () => void;
 }
 
