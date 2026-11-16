@@ -19,13 +19,13 @@ export const DISPATCHED = {
   'resolve.range': 68,
   'resolve.version_spec': 130,
   'type.validate': 60,
+  'schema.validate_profile': 135,
+  'schema.definition_validate': 58,
 };
 
 /** Rows that cannot run on the portable surface of the pinned core, and why. */
 export const NOT_DISPATCHED = {
   'build.args': [485, 'loads the tool from a register version file; the wire offers that source only natively'],
-  'schema.validate_profile': [135, 'reads the schema from a file path or UKIRYU_SCHEMA_PATH; the wire has no schema-text form of it'],
-  'schema.definition_validate': [58, 'reads the schema from a file path; the wire has no schema-text form of it'],
   'cli.run': [21, 'runs the ukiryu command-line program as a process'],
   'resolve.shell_detect': [17, 'detects the host shell (owner decision D2 is open; the wire has no shell detection)'],
   'lint.string': [70, 'linting belongs to another card'],
@@ -97,6 +97,14 @@ export async function runCorpus({ engine, api, load, digest }) {
   // ---------------------------------------------------------------- dispatch
   const plain = (map) => Object.fromEntries([...map].map(([key, value]) => [key, decode(value)]));
   const indexes = new Map();
+  // A schema the row names, as text. The manifest lists every input file, so
+  // a schema it does not list does not exist; like a row without a schema,
+  // that is a missing schema file to the original (null).
+  const schemaText = async (path) => {
+    if (path === null || path === undefined || !inputDigests.has(path)) return null;
+    if (!indexes.has(path)) indexes.set(path, await readInput(path));
+    return indexes.get(path);
+  };
   const request = async (op, input) => {
     if (op.startsWith('shell.')) {
       const fields = plain(input);
@@ -117,6 +125,34 @@ export async function runCorpus({ engine, api, load, digest }) {
       case 'type.validate': {
         const { value, type, options } = plain(input);
         return { group: op, call: () => engine.validate({ method: 'type', value, type, options: options ?? new Map() }) };
+      }
+      case 'schema.validate_profile': {
+        const { yaml, file, schema: path } = plain(input);
+        const profile = yaml ?? (await readInput(file));
+        const schema = await schemaText(path);
+        return { group: op, call: () => engine.schema({ method: 'validate_profile_text', profile, schema }) };
+      }
+      case 'schema.definition_validate': {
+        const { yaml, file, schema: path } = plain(input);
+        const definition = yaml ?? (await readInput(file));
+        const schema = await schemaText(path);
+        const schema_format = typeof path === 'string' && path.endsWith('.json') ? 'json' : 'yaml';
+        return {
+          group: op,
+          call: () => {
+            const report = engine.validate({ method: 'definition_text', yaml: definition, schema, schema_format });
+            // `ValidationResult#to_h`: a Hash with Symbol keys.
+            const sym = (name) => RubySymbol.for(name);
+            return new Map([
+              [sym('valid'), report.valid],
+              [sym('errors'), report.errors],
+              [sym('warnings'), report.warnings],
+              [sym('schema_path'), report.schema_path],
+              [sym('error_count'), report.error_count],
+              [sym('warning_count'), report.warning_count],
+            ]);
+          },
+        };
       }
       default:
         return null;

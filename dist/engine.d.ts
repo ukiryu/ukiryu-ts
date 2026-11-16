@@ -94,6 +94,17 @@ export interface BuildRequest {
     command: string;
     params?: RubyInput;
 }
+/**
+ * A tool definition validated against a schema supplied as text, loaded as a
+ * schema file of `schema_format` (default `yaml`) would be. A null or absent
+ * schema skips the schema stage.
+ */
+export interface DefinitionTextRequest {
+    method: 'definition_text';
+    yaml: string;
+    schema?: string | null;
+    schema_format?: 'yaml' | 'json';
+}
 export type ValidateRequest = {
     method: 'type';
     value: RubyInput;
@@ -102,11 +113,21 @@ export type ValidateRequest = {
 } | {
     method: 'definition';
     yaml: string;
-};
+} | DefinitionTextRequest;
 export type SchemaRequest = {
     method: 'fully_validate';
     profile: string;
     schema: string;
+    strict?: boolean;
+}
+/**
+ * `SchemaValidator.validate_profile` with the schema supplied as text. A
+ * null or absent schema is a missing schema file (`["Failed to load schema"]`).
+ */
+ | {
+    method: 'validate_profile_text';
+    profile: string;
+    schema?: string | null;
     strict?: boolean;
 };
 /** A built command, up to the point where it would be executed. */
@@ -166,8 +187,11 @@ export declare class Ukiryu {
     validate(request: {
         method: 'definition';
         yaml: string;
-    }): DefinitionReport;
-    /** `JSON::Validator.fully_validate(schema, profile, strict:)` over supplied YAML documents. */
+    } | DefinitionTextRequest): DefinitionReport;
+    /**
+     * `JSON::Validator.fully_validate(schema, profile, strict:)`, or
+     * `SchemaValidator.validate_profile`, over supplied YAML documents.
+     */
     schema(request: SchemaRequest): string[];
 }
 export type { RubySymbol };

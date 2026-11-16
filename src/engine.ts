@@ -86,11 +86,30 @@ export interface BuildRequest {
   params?: RubyInput;
 }
 
+/**
+ * A tool definition validated against a schema supplied as text, loaded as a
+ * schema file of `schema_format` (default `yaml`) would be. A null or absent
+ * schema skips the schema stage.
+ */
+export interface DefinitionTextRequest {
+  method: 'definition_text';
+  yaml: string;
+  schema?: string | null;
+  schema_format?: 'yaml' | 'json';
+}
+
 export type ValidateRequest =
   | { method: 'type'; value: RubyInput; type: RubyInput; options?: RubyInput }
-  | { method: 'definition'; yaml: string };
+  | { method: 'definition'; yaml: string }
+  | DefinitionTextRequest;
 
-export type SchemaRequest = { method: 'fully_validate'; profile: string; schema: string; strict?: boolean };
+export type SchemaRequest =
+  | { method: 'fully_validate'; profile: string; schema: string; strict?: boolean }
+  /**
+   * `SchemaValidator.validate_profile` with the schema supplied as text. A
+   * null or absent schema is a missing schema file (`["Failed to load schema"]`).
+   */
+  | { method: 'validate_profile_text'; profile: string; schema?: string | null; strict?: boolean };
 
 // ------------------------------------------------------------------- replies
 
@@ -219,10 +238,10 @@ export class Ukiryu {
    * tool definition's validation report.
    */
   validate(request: { method: 'type'; value: RubyInput; type: RubyInput; options?: RubyInput }): RubyValue;
-  validate(request: { method: 'definition'; yaml: string }): DefinitionReport;
+  validate(request: { method: 'definition'; yaml: string } | DefinitionTextRequest): DefinitionReport;
   validate(request: ValidateRequest): RubyValue | DefinitionReport {
     const value = decode(this.request('validate', request as { [key: string]: RubyInput }));
-    if (request.method !== 'definition') return value;
+    if (request.method === 'type') return value;
     const report = record(value, 'validate value');
     const count = (key: string) => {
       const n = member(report, key, 'validate');
@@ -242,7 +261,10 @@ export class Ukiryu {
     };
   }
 
-  /** `JSON::Validator.fully_validate(schema, profile, strict:)` over supplied YAML documents. */
+  /**
+   * `JSON::Validator.fully_validate(schema, profile, strict:)`, or
+   * `SchemaValidator.validate_profile`, over supplied YAML documents.
+   */
   schema(request: SchemaRequest): string[] {
     return strings(decode(this.request('schema', request as { [key: string]: RubyInput })), 'schema value');
   }

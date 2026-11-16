@@ -81,6 +81,29 @@ test('schema fully_validate takes the schema as text', () => {
   assert.equal(errors.length, 1);
 });
 
+test('schema validate_profile_text takes the schema as text', () => {
+  const schema = 'type: object\nrequired: [name]\nproperties:\n  name: {type: string}\n';
+  assert.deepEqual(engine.schema({ method: 'validate_profile_text', profile: 'name: x\n', schema }), []);
+  assert.equal(engine.schema({ method: 'validate_profile_text', profile: 'other: 1\n', schema }).length, 1);
+  assert.deepEqual(engine.schema({ method: 'validate_profile_text', profile: 'name: x\n', schema: null }), [
+    'Failed to load schema',
+  ]);
+});
+
+test('validate definition_text runs the supplied schema stage', () => {
+  const schema = '{"type": "object", "required": ["nonexistent_key"]}';
+  const report = engine.validate({ method: 'definition_text', yaml: DEFINITION, schema, schema_format: 'json' });
+  assert.equal(report.schema_stage.get('kind'), 'supplied');
+  assert.ok(report.errors.some((e) => e.includes('nonexistent_key')), report.errors.join('\n'));
+  const skipped = engine.validate({ method: 'definition_text', yaml: DEFINITION });
+  assert.equal(skipped.schema_stage.get('kind'), 'supplied_not_loaded');
+});
+
+test('Hash key order survives the engine reply', () => {
+  const value = engine.validate({ method: 'type', value: new Map([['zeta', 1n], ['alpha', 2n], ['mid', 3n]]), type: RubySymbol.for('hash') });
+  assert.deepEqual([...value.keys()], ['zeta', 'alpha', 'mid']);
+});
+
 test('Integer and Float values cross the engine exactly', () => {
   const big = 2n ** 80n + 7n;
   assert.equal(engine.validate({ method: 'type', value: big, type: RubySymbol.for('integer') }), big);

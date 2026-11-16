@@ -121,7 +121,7 @@ export class Ukiryu {
     }
     validate(request) {
         const value = decode(this.request('validate', request));
-        if (request.method !== 'definition')
+        if (request.method === 'type')
             return value;
         const report = record(value, 'validate value');
         const count = (key) => {
@@ -141,7 +141,10 @@ export class Ukiryu {
             schema_stage: check(stage === null || stage instanceof Map, stage, 'validate.schema_stage'),
         };
     }
-    /** `JSON::Validator.fully_validate(schema, profile, strict:)` over supplied YAML documents. */
+    /**
+     * `JSON::Validator.fully_validate(schema, profile, strict:)`, or
+     * `SchemaValidator.validate_profile`, over supplied YAML documents.
+     */
     schema(request) {
         return strings(decode(this.request('schema', request)), 'schema value');
     }
