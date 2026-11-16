@@ -33,7 +33,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --test test/unit/",
+    "test": "node --test test/unit/*.test.mjs",
     "conformance": "node test/conformance/node.mjs",
     "conformance:browser": "node test/conformance/browser.mjs"
   },
