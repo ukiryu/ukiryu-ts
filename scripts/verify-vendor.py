@@ -6,7 +6,11 @@ Checks, for vendor/ukiryu-wasm (wasm-pack nodejs) and vendor/ukiryu-web
 
 - BUILT_FROM names the pinned core commit and a well-formed lock hash;
 - the delivered files are exactly the files BUILT_FROM lists, plus BUILT_FROM,
-  and every file has the listed sha256;
+  and every file has the listed sha256. The one exception is wasm-pack's
+  `.gitignore` (`*`): it is a version-control hint, not engine content, and
+  npm applies it inside a dependency directory, which would drop the engine
+  from the package. The vendor layout leaves it out; if present it must
+  still match its hash;
 - the lock hash, crate version, LICENSE and Onigmo notices equal the core
   source at that commit (read with git from a core checkout);
 - with --track, the commit is an ancestor of that ref of the core checkout
@@ -24,6 +28,8 @@ TARGETS = ('ukiryu-wasm', 'ukiryu-web')
 ONIGMO = ('NOTICE', 'LEGAL', 'COPYING', 'BSDL', 'PROVENANCE')
 REQUIRED = {'LICENSE', 'package.json', 'ukiryu.js', 'ukiryu.d.ts', 'ukiryu_bg.wasm',
             'ukiryu_bg.wasm.d.ts'} | {f'licenses/onigmo/{name}' for name in ONIGMO}
+# Listed in BUILT_FROM but left out of the vendor layout (see above).
+OMITTED = {'.gitignore'}
 
 
 def fail(message):
@@ -75,11 +81,14 @@ def main():
         if not REQUIRED <= files.keys():
             fail(f'{target}: BUILT_FROM lacks {sorted(REQUIRED - files.keys())}')
         actual = {p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()}
-        if actual != set(files) | {'BUILT_FROM'}:
+        listed = set(files) | {'BUILT_FROM'}
+        if not (listed - OMITTED) <= actual <= listed:
             fail(f'{target}: delivered files differ from BUILT_FROM: '
-                 f'extra {sorted(actual - set(files) - {"BUILT_FROM"})}, missing {sorted(set(files) - actual)}')
+                 f'extra {sorted(actual - listed)}, missing {sorted(listed - OMITTED - actual)}')
         for name, digest in files.items():
             path = folder / name
+            if name in OMITTED and not path.exists():
+                continue
             if not path.resolve().is_relative_to(folder.resolve()):
                 fail(f'{target}: {name} escapes the vendor directory')
             if sha256(path.read_bytes()) != digest:
@@ -89,7 +98,9 @@ def main():
         for name, data in notices.items():
             if (folder / 'licenses' / 'onigmo' / name).read_bytes() != data:
                 fail(f'{target}: Onigmo {name} differs from the core source at {args.commit}')
-        print(f'{target}: {len(files)} files match BUILT_FROM at {args.commit}')
+        omitted = sorted(name for name in files if name not in actual)
+        print(f'{target}: {len(files) - len(omitted)} files match BUILT_FROM at {args.commit}'
+              + (f' (omitted: {", ".join(omitted)})' if omitted else ''))
 
     if args.track:
         result = subprocess.run(['git', '-C', str(args.core), 'merge-base', '--is-ancestor', args.commit, args.track])

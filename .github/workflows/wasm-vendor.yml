@@ -78,6 +78,9 @@ jobs:
           mkdir -p built/vendor
           cp -a core/wasm-node built/vendor/ukiryu-wasm
           cp -a core/wasm-web built/vendor/ukiryu-web
+          # wasm-pack's .gitignore ('*') would make npm drop the engine from
+          # the package; verify-vendor.py still checks every other listed file.
+          rm built/vendor/ukiryu-wasm/.gitignore built/vendor/ukiryu-web/.gitignore
           python3 package/scripts/verify-vendor.py built/vendor --core core --commit "${{ steps.pin.outputs.commit }}"
       - uses: actions/upload-artifact@v4
         with:
