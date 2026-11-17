@@ -108,6 +108,14 @@ export function process(input) {
 }
 
 /**
+ * @returns {number}
+ */
+export function abi_version() {
+    const ret = wasm.abi_version();
+    return ret >>> 0;
+}
+
+/**
  * @returns {string}
  */
 export function core_version() {
@@ -121,14 +129,6 @@ export function core_version() {
     } finally {
         wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
     }
-}
-
-/**
- * @returns {number}
- */
-export function abi_version() {
-    const ret = wasm.abi_version();
-    return ret >>> 0;
 }
 
 const EXPECTED_RESPONSE_TYPES = new Set(['basic', 'cors', 'default']);

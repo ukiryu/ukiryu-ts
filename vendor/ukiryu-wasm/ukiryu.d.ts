@@ -8,5 +8,5 @@
  * available to browser consumers merely by being added to the shared wire.
  */
 export function process(input: string): string;
-export function core_version(): string;
 export function abi_version(): number;
+export function core_version(): string;

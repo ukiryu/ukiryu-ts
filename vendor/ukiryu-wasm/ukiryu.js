@@ -102,6 +102,14 @@ exports.process = function(input) {
 };
 
 /**
+ * @returns {number}
+ */
+exports.abi_version = function() {
+    const ret = wasm.abi_version();
+    return ret >>> 0;
+};
+
+/**
  * @returns {string}
  */
 exports.core_version = function() {
@@ -115,14 +123,6 @@ exports.core_version = function() {
     } finally {
         wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
     }
-};
-
-/**
- * @returns {number}
- */
-exports.abi_version = function() {
-    const ret = wasm.abi_version();
-    return ret >>> 0;
 };
 
 exports.__wbindgen_init_externref_table = function() {
