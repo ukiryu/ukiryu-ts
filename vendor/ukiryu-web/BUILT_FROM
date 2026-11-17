@@ -1,5 +1,5 @@
 {
-  "core_commit": "0d1d5650aa5b95022427821d5b1030532a8346da",
+  "core_commit": "2cc718faad30bfc8f7be2afd05f978e8d2d41752",
   "crate_version": "0.1.0",
   "rust": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
   "wasm_pack": "wasm-pack 0.13.1",
@@ -16,7 +16,7 @@
     "package.json": "1e9dd56885453ad6a0aaa6bbfb6256c1fb5a8b5e9a8d5445a80b406b53c9ff78",
     "ukiryu.d.ts": "f6a9335373134a451b697530761a38073925ae69de979fa2796004f228c19abe",
     "ukiryu.js": "7e14bd61bffa77718283598b00ae0f1a107bff2389ed33ae8f8345bb60c60b14",
-    "ukiryu_bg.wasm": "7b81889651ee184e7a1807f3f71681773571bbc3cc33b8dc306780323534f3d7",
+    "ukiryu_bg.wasm": "29e5fe12435f0cd7efa11427d0911c99cbf88932cbf5f1fd6c58dc2da858031c",
     "ukiryu_bg.wasm.d.ts": "6e53948089c34a0b931ae7829ee4bee4fb5e0277e78707702b3ab05076de2fc1"
   }
 }
