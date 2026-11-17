@@ -44,9 +44,12 @@ The operations are:
 - `resolve(request)`: `extract_version`, `range`, `version_spec` (over a
   supplied version index) and `tool` (the identity of a supplied definition).
 - `build(request)`: a command's arguments, environment and standard input.
-- `validate(request)`: `type` (`Ukiryu::Type.validate`) and `definition`
-  (a tool definition's validation report).
-- `schema(request)`: `fully_validate` of a profile against a supplied schema.
+- `validate(request)`: `type` (`Ukiryu::Type.validate`), and `definition`
+  and `definition_text` (a tool definition's validation report;
+  `definition_text` takes the schema as text, in YAML or JSON).
+- `schema(request)`: `fully_validate` of a profile against a supplied schema,
+  and `validate_profile_text` (`SchemaValidator.validate_profile` with the
+  schema as text; no schema gives `["Failed to load schema"]`).
 
 Errors from the engine are thrown as `UkiryuError`, with the wire error
 `code` and, where the Ruby library raises an exception, its `sourceClass`.
