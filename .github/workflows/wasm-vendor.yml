@@ -1,0 +1,99 @@
+name: Core WebAssembly vendor
+# Builds the Node and web engines from the exact ukiryu-rs commit named in
+# vendor/core-pin.json with the toolchain the core's own wasm workflow uses,
+# stamps BUILT_FROM with the core's scripts, and compares the result with the
+# committed vendor directories byte for byte.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wasm-vendor-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Build pinned core engines
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: package
+      - name: Read pin
+        id: pin
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          pin = json.load(open('package/vendor/core-pin.json'))
+          print(f"repository={pin['repository']}")
+          print(f"commit={pin['commit']}")
+          for key, value in pin['toolchain'].items():
+              print(f"{key}={value}")
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.repository }}
+          ref: ${{ steps.pin.outputs.commit }}
+          path: core
+      - name: Confirm exact core commit
+        run: test "$(git -C core rev-parse HEAD)" = "${{ steps.pin.outputs.commit }}"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.pin.outputs.rust }}
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ steps.pin.outputs.emscripten }}
+      - name: Prepare pinned scalar C runtime
+        run: embuilder build libc
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/wasm-tools
+          key: wasm-pack-${{ steps.pin.outputs.wasm_pack }}-rust${{ steps.pin.outputs.rust }}-${{ runner.os }}
+      - name: Prepare pinned wasm-pack
+        run: |
+          if ! test -x "$RUNNER_TEMP/wasm-tools/bin/wasm-pack"; then
+            cargo install wasm-pack --version "${{ steps.pin.outputs.wasm_pack }}" --locked --root "$RUNNER_TEMP/wasm-tools"
+          fi
+          echo "$RUNNER_TEMP/wasm-tools/bin" >> "$GITHUB_PATH"
+      - name: Build Node and web engines
+        working-directory: core
+        run: |
+          wasm-pack build ukiryu --target nodejs --out-dir ../wasm-node --no-opt -- --locked --features wasm
+          wasm-pack build ukiryu --target web --out-dir ../wasm-web --no-opt -- --locked --features wasm
+          cp LICENSE wasm-node/LICENSE
+          cp LICENSE wasm-web/LICENSE
+          python3 scripts/artifact_licenses.py stage wasm-node wasm-web
+          python3 scripts/stamp-wasm-build.py
+          python3 scripts/artifact_licenses.py verify --npm wasm-node wasm-web
+          python3 scripts/verify-wasm-artifacts.py .
+      - name: Arrange package vendor layout
+        run: |
+          mkdir -p built/vendor
+          cp -a core/wasm-node built/vendor/ukiryu-wasm
+          cp -a core/wasm-web built/vendor/ukiryu-web
+          # wasm-pack's .gitignore ('*') would make npm drop the engine from
+          # the package; verify-vendor.py still checks every other listed file.
+          rm built/vendor/ukiryu-wasm/.gitignore built/vendor/ukiryu-web/.gitignore
+          python3 package/scripts/verify-vendor.py built/vendor --core core --commit "${{ steps.pin.outputs.commit }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ukiryu-vendor
+          include-hidden-files: true
+          path: built/vendor
+      - name: Committed vendor matches this build
+        run: |
+          for target in ukiryu-wasm ukiryu-web; do
+            if ! test -d "package/vendor/$target"; then
+              echo "::error::vendor/$target is not committed; vendor the ukiryu-vendor artifact of this run"
+              exit 1
+            fi
+          done
+          diff -r built/vendor/ukiryu-wasm package/vendor/ukiryu-wasm
+          diff -r built/vendor/ukiryu-web package/vendor/ukiryu-web

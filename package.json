@@ -1,0 +1,45 @@
+{
+  "name": "ukiryu",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ukiryu command planning in TypeScript, running the Ukiryu core as WebAssembly in Node.js and browsers",
+  "license": "BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ukiryu/ukiryu-ts.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      },
+      "default": {
+        "types": "./dist/web.d.ts",
+        "default": "./dist/web.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "vendor/ukiryu-wasm",
+    "vendor/ukiryu-web"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/unit/*.test.mjs",
+    "conformance": "node test/conformance/node.mjs",
+    "conformance:browser": "node test/conformance/browser.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "playwright": "1.51.1",
+    "typescript": "5.9.3"
+  }
+}

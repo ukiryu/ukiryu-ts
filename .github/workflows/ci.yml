@@ -1,0 +1,106 @@
+name: CI
+# Builds the TypeScript runtime, checks that the committed dist/ matches the
+# sources, checks the committed core engines against the pinned ukiryu-rs
+# commit, and runs the unit tests and the conformance corpus in Node and in
+# headless Chromium. Nothing is published.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: package
+      - name: Read pin
+        id: pin
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          pin = json.load(open('package/vendor/core-pin.json'))
+          print(f"repository={pin['repository']}")
+          print(f"commit={pin['commit']}")
+          print(f"track={pin['track']}")
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.repository }}
+          ref: ${{ steps.pin.outputs.commit }}
+          path: core
+          fetch-depth: 0
+      - name: Confirm exact core commit
+        run: test "$(git -C core rev-parse HEAD)" = "${{ steps.pin.outputs.commit }}"
+      - name: Committed engines match the pinned core
+        run: |
+          python3 package/scripts/verify-vendor.py package/vendor \
+            --core core --commit "${{ steps.pin.outputs.commit }}" \
+            --track "origin/${{ steps.pin.outputs.track }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: package/package-lock.json
+      - name: Install
+        working-directory: package
+        run: npm ci
+      - name: Build
+        working-directory: package
+        run: npm run build
+      - name: Committed dist matches the sources
+        working-directory: package
+        run: |
+          git diff --exit-code -- dist
+          untracked="$(git ls-files --others --exclude-standard -- dist)"
+          if [ -n "$untracked" ]; then echo "untracked build output:"; echo "$untracked"; exit 1; fi
+      - name: Unit tests
+        working-directory: package
+        run: npm test
+      - name: Conformance corpus in Node
+        working-directory: package
+        env:
+          UKIRYU_CONFORMANCE_DIR: ${{ github.workspace }}/core/corpus/conformance
+        run: npm run conformance
+      - name: Install Chromium
+        if: matrix.node == '22'
+        working-directory: package
+        run: npx playwright install --with-deps chromium
+      - name: Conformance corpus in Chromium
+        if: matrix.node == '22'
+        working-directory: package
+        env:
+          UKIRYU_CONFORMANCE_DIR: ${{ github.workspace }}/core/corpus/conformance
+        run: npm run conformance:browser
+      - name: Package contents
+        if: matrix.node == '22'
+        working-directory: package
+        run: |
+          npm pack --dry-run --json > "$RUNNER_TEMP/pack.json"
+          python3 - "$RUNNER_TEMP/pack.json" <<'PY'
+          import json, subprocess, sys
+          [pack] = json.load(open(sys.argv[1]))
+          assert pack['name'] == 'ukiryu' and pack['version'] == '0.1.0', pack['id']
+          files = {entry['path'] for entry in pack['files']}
+          tracked = set(subprocess.run(
+              ['git', 'ls-files', '--', 'dist', 'vendor/ukiryu-wasm', 'vendor/ukiryu-web'],
+              check=True, capture_output=True, text=True).stdout.split())
+          expected = tracked | {'package.json', 'README.md', 'LICENSE'}
+          expected = {path for path in expected if not path.endswith('/.gitignore')}
+          missing, extra = sorted(expected - files), sorted(files - expected)
+          print(f"{len(files)} files in the package")
+          if missing or extra:
+              sys.exit(f"missing {missing}, unexpected {extra}")
+          PY

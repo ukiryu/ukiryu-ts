@@ -1,0 +1,21 @@
+{
+  "name": "ukiryu",
+  "collaborators": [
+    "Ribose Inc. <open.source@ribose.com>"
+  ],
+  "description": "Shared Ukiryu command execution core",
+  "version": "0.1.0",
+  "license": "BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ukiryu/ukiryu-rs"
+  },
+  "files": [
+    "ukiryu_bg.wasm",
+    "ukiryu.js",
+    "ukiryu.d.ts",
+    "licenses"
+  ],
+  "main": "ukiryu.js",
+  "types": "ukiryu.d.ts"
+}
