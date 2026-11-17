@@ -1,0 +1,68 @@
+name: npm pack
+# Builds the wasm engines (the wasm-vendor workflow, reused), packs the real
+# tarball, verifies its contents against the committed layout and the engine
+# build record, and installs it into a clean project. The tarball is uploaded
+# as a workflow artifact. Nothing is published: no registry upload, no token, no
+# provenance. The package is private until the owner decides otherwise.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pack-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  wasm:
+    name: Build wasm engines
+    uses: ./.github/workflows/wasm-vendor.yml
+  pack:
+    name: Pack and verify tarball
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: ukiryu-vendor
+          path: built-vendor
+      - name: Use the freshly built engines
+        run: |
+          rm -rf vendor/ukiryu-wasm vendor/ukiryu-web
+          cp -a built-vendor/ukiryu-wasm vendor/ukiryu-wasm
+          cp -a built-vendor/ukiryu-web vendor/ukiryu-web
+      - run: npm ci
+      - run: npm run build
+      - name: Pack
+        run: |
+          mkdir pack-out
+          npm pack --pack-destination pack-out --json > pack-out/pack.json
+          ls -l pack-out
+      - name: Verify tarball contents
+        run: python3 scripts/verify-pack.py pack-out/ukiryu-*.tgz --package-dir .
+      - name: Install into a clean project and load
+        run: |
+          set -euo pipefail
+          tarball="$(ls "$PWD"/pack-out/ukiryu-*.tgz)"
+          mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          npm init -y >/dev/null
+          npm install --ignore-scripts "$tarball"
+          node --input-type=module -e "
+            const m = await import('ukiryu');
+            const e = await m.load();
+            if (!e) throw new Error('engine did not load');
+            console.log('loaded; exports:', Object.keys(m).sort().join(','));
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ukiryu-npm-tarball
+          path: pack-out/ukiryu-*.tgz
+          if-no-files-found: error
+          retention-days: 7
