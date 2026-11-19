@@ -95,8 +95,6 @@ test('lossy inputs are refused', () => {
 
 test('malformed tags are refused', () => {
   for (const text of [
-    '{"$sym":"a","b":1}',
-    '{"$unknown":1}',
     '{"$bytes":"abc"}',
     '{"$int":"1.5"}',
     '{"$time":{"seconds":"1","nanos":0,"utc_offset":0}}',
@@ -105,6 +103,16 @@ test('malformed tags are refused', () => {
   ]) {
     assert.throws(() => back(text), TypeError, text);
   }
+});
+
+test('an object that is not a lone tag name reads as a Hash', () => {
+  const hash = (pairs) => new Map(pairs);
+  assert.deepEqual(back('{"$unknown":1}'), hash([['$unknown', 1n]]));
+  assert.deepEqual(back('{"$ref":"#/x"}'), hash([['$ref', '#/x']]));
+  assert.deepEqual(back('{"a":{"$ref":{"$sym":"b"}}}'), hash([['a', hash([['$ref', back('{"$sym":"b"}')]])]]));
+  assert.deepEqual(back('{"$sym":"a","b":1}'), hash([['$sym', 'a'], ['b', 1n]]));
+  assert.deepEqual(back('{"$schema":"s","$id":"i"}'), hash([['$schema', 's'], ['$id', 'i']]));
+  assert.equal(wire(back('{"$ref":"#/x"}')), '{"$map":[["$ref","#/x"]]}');
 });
 
 test('jsonEqual compares objects structurally and numbers exactly', () => {

@@ -221,6 +221,7 @@ function fields(inner, allowed, tag) {
             throw new TypeError(`${tag} takes only ${allowed.join(', ')}`);
     }
 }
+const TAGS = ['$sym', '$float', '$int', '$time', '$regexp', '$bytes', '$map'];
 function decodeAt(json, depth) {
     if (depth > 256)
         throw new RangeError('value nesting is too deep');
@@ -232,8 +233,12 @@ function decodeAt(json, depth) {
     }
     if (Array.isArray(json))
         return json.map((item) => decodeAt(item, depth + 1));
+    // As in the core (ukiryu-rs wire/value.rs): an object is a tag exactly
+    // when it has one key and that key is a tag name. Any other object is a
+    // Hash with String keys, even when its keys start with `$` (`$schema` and
+    // `$id`, or a lone JSON-schema `$ref`).
     const [first] = json.keys();
-    if (first !== undefined && first.startsWith('$')) {
+    if (first !== undefined && json.size === 1 && TAGS.includes(first)) {
         const inner = only(json, first);
         switch (first) {
             case '$sym':
