@@ -14,6 +14,7 @@
 
 /** Rows dispatched through the portable API, per corpus operation. */
 export const DISPATCHED = {
+  'build.args': 485,
   'shell.*': 12616,
   'resolve.extract_version': 372,
   'resolve.range': 68,
@@ -25,7 +26,6 @@ export const DISPATCHED = {
 
 /** Rows that cannot run on the portable surface of the pinned core, and why. */
 export const NOT_DISPATCHED = {
-  'build.args': [485, 'loads the tool from a register version file; the wire offers that source only natively'],
   'cli.run': [21, 'runs the ukiryu command-line program as a process'],
   'resolve.shell_detect': [17, 'detects the host shell (owner decision D2 is open; the wire has no shell detection)'],
   'lint.string': [70, 'linting belongs to another card'],
@@ -105,6 +105,26 @@ export async function runCorpus({ engine, api, load, digest }) {
     if (!indexes.has(path)) indexes.set(path, await readInput(path));
     return indexes.get(path);
   };
+  // A register document the row names, as text. The manifest lists every
+  // input file, so one it does not list does not exist (null), as a missing
+  // file is to the original loader.
+  const registerText = async (path) => {
+    if (!inputDigests.has(path)) return null;
+    if (!indexes.has(path)) indexes.set(path, await readInput(path));
+    return indexes.get(path);
+  };
+  // Every `register/interfaces/**/*.yaml` input, keyed by its path under
+  // `interfaces/` without `.yaml`, as an index names it.
+  let interfaces = null;
+  const interfaceTexts = async () => {
+    if (interfaces) return interfaces;
+    interfaces = new Map();
+    for (const path of [...inputDigests.keys()].sort()) {
+      const match = /^register\/interfaces\/(.+)\.yaml$/.exec(path);
+      if (match) interfaces.set(match[1], await readInput(path));
+    }
+    return interfaces;
+  };
   const request = async (op, input) => {
     if (op.startsWith('shell.')) {
       const fields = plain(input);
@@ -112,6 +132,18 @@ export async function runCorpus({ engine, api, load, digest }) {
       return { group: 'shell.*', shell, call: () => engine.escape(shell, { method: op.slice(6), ...operation }) };
     }
     switch (op) {
+      case 'build.args': {
+        const { tool, implementation, file, platform, shell, command, params } = plain(input);
+        const source = {
+          kind: 'register_text',
+          tool,
+          implementation,
+          index: await registerText(`register/tools/${tool}/index.yaml`),
+          interfaces: await interfaceTexts(),
+          version: await registerText(`register/tools/${tool}/${implementation}/${file}`),
+        };
+        return { group: op, call: () => engine.build({ tool: { source, platform, shell }, command, params }).args };
+      }
       case 'resolve.extract_version':
       case 'resolve.range':
         return { group: op, call: () => engine.resolve({ method: op.slice(8), ...plain(input) }) };
@@ -229,6 +261,25 @@ export async function runCorpus({ engine, api, load, digest }) {
     const v = engine.validate({ method: 'type', value: 8n, type: RubySymbol.for('integer'), options: new Map([[RubySymbol.for('max'), 8n]]) });
     return v === 8n ? null : `got ${v}`;
   });
+  // An altered build input changes the argv, so a build match is not an echo.
+  {
+    const source = {
+      kind: 'register_text',
+      tool: 'bzip2',
+      implementation: 'default',
+      index: await registerText('register/tools/bzip2/index.yaml'),
+      interfaces: await interfaceTexts(),
+      version: await registerText('register/tools/bzip2/default/1.0.yaml'),
+    };
+    control('altered build.args input', () => {
+      const { args } = engine.build({
+        tool: { source, platform: 'linux', shell: 'bash' },
+        command: 'compress',
+        params: new Map([['inputs', ['other.txt']]]),
+      });
+      return JSON.stringify(args) === '["other.txt"]' ? null : `got ${JSON.stringify(args)}`;
+    });
+  }
   // Integers beyond 2^53 and Ruby Floats travel exactly.
   control('integer beyond 2^64', () => {
     const big = 2n ** 64n + 1n;
