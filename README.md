@@ -44,6 +44,11 @@ The operations are:
 - `resolve(request)`: `extract_version`, `range`, `version_spec` (over a
   supplied version index) and `tool` (the identity of a supplied definition).
 - `build(request)`: a command's arguments, environment and standard input.
+  The tool's `source` is either a tool definition (`kind: 'definition'`) or
+  register documents given as text (`kind: 'register_text'`: the tool's
+  `index`, the `interfaces` keyed by the path the index names, and one
+  `version` file). A register document left out is a missing file, and the
+  core reports `ToolNotFoundError`.
 - `validate(request)`: `type` (`Ukiryu::Type.validate`), and `definition`
   and `definition_text` (a tool definition's validation report;
   `definition_text` takes the schema as text, in YAML or JSON).

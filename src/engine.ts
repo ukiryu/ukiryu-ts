@@ -65,9 +65,34 @@ export interface DefinitionSource {
   yaml: string;
 }
 
+/**
+ * A tool loaded from register documents supplied as text: the loader chain
+ * of `Tool::Loader.load_with_implementation_index` (index, interface,
+ * version file, `convert_to_tool_definition`) with the implementation and
+ * version file chosen by the caller. A document left out (null or absent)
+ * is a file that does not exist, so the core reports `ToolNotFoundError`.
+ */
+export interface RegisterTextSource {
+  kind: 'register_text';
+  tool: string;
+  implementation: string;
+  /** `tools/<tool>/index.yaml`. */
+  index?: string | null;
+  /**
+   * `interfaces/<path>.yaml`, keyed by `<path>` as the index names it,
+   * without a leading `/`.
+   */
+  interfaces?: Map<string, string> | { readonly [path: string]: string };
+  /** `tools/<tool>/<implementation>/<file>`. */
+  version?: string | null;
+}
+
+/** Where a tool definition comes from. */
+export type ToolSource = DefinitionSource | RegisterTextSource;
+
 /** `Tool.new(profile, platform:, shell:, version:)` over a supplied definition. */
 export interface ToolRequest {
-  source: DefinitionSource;
+  source: ToolSource;
   platform: string;
   shell: Shell;
   version?: string | null;
