@@ -244,6 +244,8 @@ function fields(inner: JsonObject, allowed: readonly string[], tag: string): voi
   }
 }
 
+const TAGS = ['$sym', '$float', '$int', '$time', '$regexp', '$bytes', '$map'] as const;
+
 function decodeAt(json: Json, depth: number): RubyValue {
   if (depth > 256) throw new RangeError('value nesting is too deep');
   if (json === null || typeof json === 'boolean' || typeof json === 'string' || typeof json === 'bigint') {
@@ -253,8 +255,12 @@ function decodeAt(json: Json, depth: number): RubyValue {
     throw new TypeError(`the number ${json.text} is not an integer; a Float travels as $float`);
   }
   if (Array.isArray(json)) return json.map((item) => decodeAt(item, depth + 1));
+  // As in the core (ukiryu-rs wire/value.rs): an object is a tag exactly
+  // when it has one key and that key is a tag name. Any other object is a
+  // Hash with String keys, even when its keys start with `$` (`$schema` and
+  // `$id`, or a lone JSON-schema `$ref`).
   const [first] = json.keys();
-  if (first !== undefined && first.startsWith('$')) {
+  if (first !== undefined && json.size === 1 && (TAGS as readonly string[]).includes(first)) {
     const inner = only(json, first);
     switch (first) {
       case '$sym':
