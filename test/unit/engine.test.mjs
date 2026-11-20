@@ -67,8 +67,13 @@ test('resolve tool reports the identity of a supplied definition', () => {
   assert.deepEqual(identity.get('commands'), ['run']);
 });
 
-test('validate definition returns a typed report without reading files', () => {
-  const report = engine.validate({ method: 'definition', yaml: DEFINITION });
+test('validate definition needs supplied schema text on WASM', () => {
+  assert.throws(
+    () => engine.validate({ method: 'definition', yaml: DEFINITION }),
+    (error) => error instanceof UkiryuError && error.code === 'NOT_PORTED'
+      && error.message.includes('HTTP schema on WASM'),
+  );
+  const report = engine.validate({ method: 'definition_text', yaml: DEFINITION, schema: 'type: object\n' });
   assert.equal(typeof report.valid, 'boolean');
   assert.equal(typeof report.error_count, 'bigint');
   assert.ok(Array.isArray(report.errors));

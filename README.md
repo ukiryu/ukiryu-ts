@@ -59,7 +59,9 @@ The operations are:
   no deadline.
 - `validate(request)`: `type` (`Ukiryu::Type.validate`), and `definition`
   and `definition_text` (a tool definition's validation report;
-  `definition_text` takes the schema as text, in YAML or JSON).
+  `definition_text` takes the schema as text, in YAML or JSON). Use
+  `definition_text` with a supplied schema on WASM; `definition` attempts
+  schema discovery and refuses unavailable HTTP access with `NOT_PORTED`.
 - `schema(request)`: `fully_validate` of a profile against a supplied schema,
   and `validate_profile_text` (`SchemaValidator.validate_profile` with the
   schema as text; no schema gives `["Failed to load schema"]`).
