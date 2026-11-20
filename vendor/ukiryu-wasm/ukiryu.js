@@ -1,8 +1,13 @@
 
 let imports = {};
 imports['__wbindgen_placeholder__'] = module.exports;
-
-let WASM_VECTOR_LEN = 0;
+/**
+ * @returns {number}
+ */
+exports.abi_version = function() {
+    const ret = wasm.abi_version();
+    return ret >>> 0;
+};
 
 let cachedUint8ArrayMemory0 = null;
 
@@ -12,6 +17,36 @@ function getUint8ArrayMemory0() {
     }
     return cachedUint8ArrayMemory0;
 }
+
+let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+
+cachedTextDecoder.decode();
+
+function decodeText(ptr, len) {
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+}
+
+function getStringFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return decodeText(ptr, len);
+}
+/**
+ * @returns {string}
+ */
+exports.core_version = function() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.core_version();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
+    }
+};
+
+let WASM_VECTOR_LEN = 0;
 
 const cachedTextEncoder = new TextEncoder();
 
@@ -64,19 +99,6 @@ function passStringToWasm0(arg, malloc, realloc) {
     WASM_VECTOR_LEN = offset;
     return ptr;
 }
-
-let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
-
-cachedTextDecoder.decode();
-
-function decodeText(ptr, len) {
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
-}
-
-function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return decodeText(ptr, len);
-}
 /**
  * Process a JSON wire request, returning a JSON wire response.
  *
@@ -98,30 +120,6 @@ exports.process = function(input) {
         return getStringFromWasm0(ret[0], ret[1]);
     } finally {
         wasm.__wbindgen_free_command_export(deferred2_0, deferred2_1, 1);
-    }
-};
-
-/**
- * @returns {number}
- */
-exports.abi_version = function() {
-    const ret = wasm.abi_version();
-    return ret >>> 0;
-};
-
-/**
- * @returns {string}
- */
-exports.core_version = function() {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        const ret = wasm.core_version();
-        deferred1_0 = ret[0];
-        deferred1_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
     }
 };
 
