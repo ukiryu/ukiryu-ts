@@ -1,6 +1,6 @@
 {
   "repository": "ukiryu/ukiryu-rs",
-  "commit": "dcd40a4f85c00b8cb1990f5530a9614691607c9c",
+  "commit": "8e2e366d0f9f9c706fd399fd3da23147dc2a7e91",
   "track": "main",
   "toolchain": {
     "rust": "1.95.0",

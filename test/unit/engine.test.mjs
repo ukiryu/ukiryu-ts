@@ -67,8 +67,13 @@ test('resolve tool reports the identity of a supplied definition', () => {
   assert.deepEqual(identity.get('commands'), ['run']);
 });
 
-test('validate definition returns a typed report without reading files', () => {
-  const report = engine.validate({ method: 'definition', yaml: DEFINITION });
+test('validate definition needs supplied schema text on WASM', () => {
+  assert.throws(
+    () => engine.validate({ method: 'definition', yaml: DEFINITION }),
+    (error) => error instanceof UkiryuError && error.code === 'NOT_PORTED'
+      && error.message.includes('HTTP schema on WASM'),
+  );
+  const report = engine.validate({ method: 'definition_text', yaml: DEFINITION, schema: 'type: object\n' });
   assert.equal(typeof report.valid, 'boolean');
   assert.equal(typeof report.error_count, 'bigint');
   assert.ok(Array.isArray(report.errors));
@@ -97,6 +102,34 @@ test('validate definition_text runs the supplied schema stage', () => {
   assert.ok(report.errors.some((e) => e.includes('nonexistent_key')), report.errors.join('\n'));
   const skipped = engine.validate({ method: 'definition_text', yaml: DEFINITION });
   assert.equal(skipped.schema_stage.get('kind'), 'supplied_not_loaded');
+});
+
+test('CLI snapshots refuse external schema resources on every host', () => {
+  const request = (schema) => engine.request('cli.run', {
+    argv: ['validate', 'file', '/profile.yaml', '--schema', '/schema.yaml'],
+    platform: 'linux', env: {},
+    snapshot: {
+      files: { '/profile.yaml': DEFINITION, '/schema.yaml': schema },
+      executables: {}, probes: [], definitions: [],
+    },
+  });
+  assert.ok(request('type: object\n').has('exit'));
+  for (const reference of [
+    String.raw`file://D:\a\ukiryu-rs\ukiryu-rs\ukiryu/Cargo.toml`,
+    'file:///C:/host/Cargo.toml',
+    'file://localhost/C:/host/Cargo.toml',
+    String.raw`C:\host\Cargo.toml`,
+    String.raw`\\server\share\Cargo.toml`,
+    'file:///host/Cargo.toml',
+    '../host/Cargo.toml',
+    'https://example.invalid/schema.json',
+  ]) {
+    assert.throws(
+      () => request(`$ref: ${reference}\n`),
+      (error) => error instanceof UkiryuError && error.code === 'UNSUPPORTED_CAPABILITY',
+      reference,
+    );
+  }
 });
 
 test('Hash key order survives the engine reply', () => {
