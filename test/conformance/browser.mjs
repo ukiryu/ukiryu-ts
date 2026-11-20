@@ -17,6 +17,7 @@ const served = [
   ['/pkg/vendor/ukiryu-web/', path.join(root, 'vendor/ukiryu-web')],
   ['/test/', path.join(root, 'test/conformance')],
   ['/corpus/', path.resolve(dir)],
+  ['/rules/', path.resolve(dir, '../../ukiryu/tests/conformance')],
 ];
 
 const server = createServer(async (req, res) => {
@@ -69,6 +70,11 @@ try {
       api,
       load: async (file) => {
         const response = await fetch(`/corpus/${file}`);
+        if (!response.ok) throw new Error(`${file}: HTTP ${response.status}`);
+        return response.text();
+      },
+      loadRule: async (file) => {
+        const response = await fetch(`/rules/${file}`);
         if (!response.ok) throw new Error(`${file}: HTTP ${response.status}`);
         return response.text();
       },

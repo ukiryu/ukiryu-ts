@@ -12,6 +12,7 @@ const result = await runCorpus({
   engine,
   api,
   load: (file) => readFile(path.join(dir, file), 'utf8'),
+  loadRule: (file) => readFile(path.resolve(dir, '../../ukiryu/tests/conformance', file), 'utf8'),
   digest: async (text) => createHash('sha256').update(text, 'utf8').digest('hex'),
 });
 console.log(`Node ${process.version}: ${JSON.stringify(result)}`);

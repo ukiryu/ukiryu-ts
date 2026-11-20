@@ -1,3 +1,4 @@
+import { yamlReplay } from './yaml.mjs';
 import { cliSnapshot, renderCli, portableCliApplicability } from './cli-snapshot.mjs';
 // The conformance corpus through the package's public API, in Node or a
 // browser. This file maps corpus rows to API calls and compares results with
@@ -16,6 +17,8 @@ import { cliSnapshot, renderCli, portableCliApplicability } from './cli-snapshot
 /** Rows dispatched through the portable API, per corpus operation. */
 export const DISPATCHED = {
   'cli.run': 21,
+  'yaml.load': 81,
+  'yaml.lutaml_roundtrip': 2,
   'build.args': 485,
   'shell.*': 12616,
   'resolve.extract_version': 372,
@@ -28,11 +31,9 @@ export const DISPATCHED = {
 
 /** Rows that cannot run on the portable surface of the pinned core, and why. */
 export const NOT_DISPATCHED = {
-  'resolve.shell_detect': [17, 'detects the host shell (owner decision D2 is open; the wire has no shell detection)'],
+  'resolve.shell_detect': [17, 'host shell detection is not mapped by this portable runner'],
   'lint.string': [70, 'linting belongs to another card'],
-  'yaml.load': [81, 'YAML loading belongs to another card'],
-  'yaml.model_load': [62, 'YAML loading belongs to another card'],
-  'yaml.lutaml_roundtrip': [2, 'YAML loading belongs to another card'],
+  'yaml.model_load': [62, 'the pinned WASM model_load reads files; register-model snapshots need a core text-input API'],
 };
 
 export const ORACLE_COMMIT = 'ab6df353c6dc2d7faf7817a86aafcafa82579896';
@@ -45,9 +46,10 @@ const SHELLS = ['bash', 'zsh', 'fish', 'sh', 'dash', 'tcsh', 'powershell', 'cmd'
  * @param {import('../../dist/node.js').Ukiryu} context.engine
  * @param {typeof import('../../dist/index.js')} context.api
  * @param {(path: string) => Promise<string>} context.load a file of the corpus directory, as text
+ * @param {(path: string) => Promise<string>} context.loadRule a file under the pinned core's ukiryu/tests/conformance
  * @param {(text: string) => Promise<string>} context.digest hex SHA-256 of the UTF-8 text
  */
-export async function runCorpus({ engine, api, load, digest }) {
+export async function runCorpus({ engine, api, load, loadRule, digest }) {
   const { parseJson, stringifyJson, jsonEqual, encode, decode, UkiryuError, RubySymbol } = api;
   const problems = [];
   const fail = (message) => {
@@ -127,7 +129,9 @@ export async function runCorpus({ engine, api, load, digest }) {
     return interfaces;
   };
   let cliContext;
-  const request = async (op, input) => {
+  const yamlRequest = yamlReplay({ engine, api, readInput, loadRule, digest });
+  const request = async (op, input, id) => {
+    if (op === 'yaml.load' || op === 'yaml.lutaml_roundtrip') return yamlRequest(op, input, id);
     if (op === 'cli.run') {
       cliContext ??= await cliSnapshot(inputDigests.keys(), readInput);
       return { group: op, call: () => renderCli(engine, plain(input).argv, cliContext) };
@@ -215,7 +219,7 @@ export async function runCorpus({ engine, api, load, digest }) {
     const id = get(row, 'id');
     const op = get(row, 'op');
     const applicability = get(row, 'applicability');
-    const job = await request(op, get(row, 'input'));
+    const job = await request(op, get(row, 'input'), id);
     if (!job) {
       if (!Object.hasOwn(NOT_DISPATCHED, op)) fail(`${id}: operation ${op} is neither dispatched nor listed as not dispatched`);
       skipped[op] = (skipped[op] ?? 0) + 1;
@@ -230,7 +234,8 @@ export async function runCorpus({ engine, api, load, digest }) {
     if (job.shell !== undefined) shells.set(job.shell, (shells.get(job.shell) ?? 0) + 1);
     const have = outcome(job.call);
     const want = get(row, 'expect');
-    if (!jsonEqual(have, want)) problems.push(`${id}:\n  got  ${stringifyJson(have)}\n  want ${stringifyJson(want)}`);
+    const mismatch = job.mismatch ? await job.mismatch(have, want) : (jsonEqual(have, want) ? null : 'outcome differs');
+    if (mismatch) problems.push(`${id}: ${mismatch}\n  got  ${stringifyJson(have)}\n  want ${stringifyJson(want)}`);
   }
 
   for (const [op, count] of Object.entries(DISPATCHED)) {
