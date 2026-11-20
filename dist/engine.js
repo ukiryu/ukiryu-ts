@@ -1,11 +1,11 @@
 /**
  * The runtime over one core engine.
  *
- * Every operation is one request to the core's `process` export: the request
+ * Every portable operation is one request to the core's `process` export: the request
  * is encoded with the lossless codec, the core does all of the work, and the
- * reply is decoded back into typed values. This module adds no behaviour of
- * its own: no tool loading, YAML, escaping, version matching or validation
- * happens in TypeScript.
+ * reply is decoded back into typed values. Tool loading, YAML, escaping,
+ * version matching and validation stay in the core. Execution delegates the
+ * built argv to an optional host adapter.
  *
  * The engine is portable: it has no filesystem, environment, clock or
  * subprocess. Tool definitions, version indexes, profiles and schemas are
@@ -58,19 +58,21 @@ function check(ok, value, what) {
 // -------------------------------------------------------------------- engine
 export class Ukiryu {
     #binding;
+    #spawner;
     /** The core's crate version. */
     coreVersion;
-    constructor(binding) {
+    constructor(binding, spawner) {
         this.#binding = binding;
+        this.#spawner = spawner;
         this.coreVersion = binding.core_version();
     }
     /** Wrap an initialized core engine, refusing one that speaks another ABI. */
-    static fromBinding(binding) {
+    static fromBinding(binding, spawner) {
         const abi = binding.abi_version();
         if (abi !== ABI_VERSION) {
             throw new Error(`the core engine speaks wire ABI ${abi}; this runtime speaks ABI ${ABI_VERSION}`);
         }
-        return new Ukiryu(binding);
+        return new Ukiryu(binding, spawner);
     }
     /**
      * Send one wire request and return the reply's `value`. The request is
@@ -118,6 +120,37 @@ export class Ukiryu {
             stdin: check(stdin === null || typeof stdin === 'string' || stdin instanceof Uint8Array, stdin, 'build.stdin'),
             command_name: check(typeof commandName === 'string', commandName, 'build.command_name'),
         };
+    }
+    /** Build in the core, then run the resulting argv through the host adapter. */
+    async execute(request, options = {}) {
+        if (!this.#spawner) {
+            throw new UkiryuError(new Map([
+                ['code', 'UNSUPPORTED_CAPABILITY'],
+                ['message', 'Execution requires a Spawner; the browser entry provides none'],
+            ]));
+        }
+        const timeout = options.timeout ?? 0;
+        if (!Number.isFinite(timeout) || timeout < 0 || timeout * 1000 > 2147483647) {
+            throw new RangeError('timeout must be finite, non-negative seconds within the host timer range');
+        }
+        const built = this.build(request);
+        const executable = options.executable ?? built.executable;
+        if (!executable) {
+            throw new UkiryuError(new Map([
+                ['code', 'EXECUTABLE_REQUIRED'],
+                ['message', 'The portable core cannot discover executables; pass options.executable'],
+            ]));
+        }
+        const identity = record(this.resolve({ method: 'tool', ...request.tool }), 'resolve tool');
+        const shell = member(identity, 'shell', 'resolve tool');
+        return this.#spawner.spawn({
+            argv: [executable, ...built.args],
+            shell: check(typeof shell === 'string', shell, 'resolve tool.shell'),
+            env: { ...Object.fromEntries(built.env), ...options.env },
+            cwd: options.cwd,
+            stdin: options.stdin === undefined ? built.stdin : options.stdin,
+            timeout,
+        });
     }
     validate(request) {
         const value = decode(this.request('validate', request));

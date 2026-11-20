@@ -3,15 +3,16 @@
 The TypeScript runtime for Ukiryu. It runs the Ukiryu core engine, compiled
 from Rust to WebAssembly, in Node.js 22 or later and in browsers.
 
-The package is a thin layer. Every operation is one request to the core
+The package is a thin layer. Portable operations are requests to the core
 engine: TypeScript encodes the request, the engine does the work, and
 TypeScript decodes the reply into typed values. Tool loading, YAML parsing,
 shell escaping, version matching and validation all happen in the engine.
 
 The engine has no filesystem, environment, clock or subprocess access. Tool
 definitions, version indexes, profiles and schemas are passed in as text.
-The package never runs a command; `build` returns the arguments, environment
-and standard input that a command would be run with.
+`build` returns the arguments, environment and standard input that a command
+would be run with. In Node, `execute` passes that plan to a subprocess
+adapter. Browsers have no adapter and refuse execution.
 
 This package is not published yet.
 
@@ -49,6 +50,13 @@ The operations are:
   `index`, the `interfaces` keyed by the path the index names, and one
   `version` file). A register document left out is a missing file, and the
   core reports `ToolNotFoundError`.
+- `execute(request, options)`: builds the same request and passes its argv
+  to a `Spawner`. Node's `load()` supplies `nodeSpawner`; the browser entry
+  supplies none. Pass `options.executable` with the host executable path:
+  the portable core cannot discover it. Optional `env` overlays the built
+  environment and the inherited Node environment; `cwd` and `stdin` can
+  also be supplied. `timeout` is in seconds, with zero (the default) meaning
+  no deadline.
 - `validate(request)`: `type` (`Ukiryu::Type.validate`), and `definition`
   and `definition_text` (a tool definition's validation report;
   `definition_text` takes the schema as text, in YAML or JSON).
@@ -58,6 +66,20 @@ The operations are:
 
 Errors from the engine are thrown as `UkiryuError`, with the wire error
 `code` and, where the Ruby library raises an exception, its `sourceClass`.
+
+Node execution returns raw `Uint8Array` streams (`stdout`, `stderr`),
+`exitStatus` (null when terminated by a signal), `signal` and `timedOut`.
+Nonzero exits are returned; spawn failures throw `UkiryuError` with code
+`SPAWN_ERROR`. The adapter uses `node:child_process` with `shell: false`:
+argv is passed unchanged from the core's build for the selected profile and
+shell. It does not invoke a shell interpreter or expand shell syntax. A
+timeout kills the direct child, not a process tree. Hosts can wrap a core
+binding with `Ukiryu.fromBinding(binding, spawner)` to provide another
+adapter implementing the exported `Spawner` interface.
+
+This is a host execution hook. The pinned WASM does not expose the native
+executor's result parsing, exit-code meanings, or shell invocation planner.
+Those behaviours are not emulated in TypeScript.
 
 ## Values
 
@@ -101,6 +123,12 @@ The conformance runs read the corpus of the pinned core and compare every
 row the portable engine can answer with the Ruby library's recorded result.
 Rows that need a file, a process or the host are counted and listed with the
 reason in `test/conformance/corpus.mjs`.
+
+Both CI runners enforce 13,924 dispatched rows, including build, escape,
+resolve and validate, with fixed per-operation counts. The 21 `cli.run`
+rows remain blocked: the pinned WASM exposes no portable CLI renderer and
+rejects `cli` and `cli.run` with `UNSUPPORTED_CAPABILITY`. Node's spawn hook
+does not supply the Ukiryu CLI binary. Corpus expectations are unchanged.
 
 CI fails if `dist/` differs from a fresh build.
 

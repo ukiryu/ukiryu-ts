@@ -57,6 +57,13 @@ try {
     const { runCorpus } = await import('/test/corpus.mjs');
     const engine = await api.load();
     const typeofProcess = typeof globalThis.process;
+    let executionRefused = false;
+    try {
+      await engine.execute({});
+    } catch (error) {
+      executionRefused = error instanceof api.UkiryuError && error.code === 'UNSUPPORTED_CAPABILITY';
+    }
+    if (!executionRefused) throw new Error('the browser entry must refuse execution without a Spawner');
     const summary = await runCorpus({
       engine,
       api,
