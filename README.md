@@ -59,7 +59,9 @@ The operations are:
   no deadline.
 - `validate(request)`: `type` (`Ukiryu::Type.validate`), and `definition`
   and `definition_text` (a tool definition's validation report;
-  `definition_text` takes the schema as text, in YAML or JSON).
+  `definition_text` takes the schema as text, in YAML or JSON). Use
+  `definition_text` with a supplied schema on WASM; `definition` attempts
+  schema discovery and refuses unavailable HTTP access with `NOT_PORTED`.
 - `schema(request)`: `fully_validate` of a profile against a supplied schema,
   and `validate_profile_text` (`SchemaValidator.validate_profile` with the
   schema as text; no schema gives `["Failed to load schema"]`).
@@ -135,6 +137,9 @@ Roundtrips follow the pinned core's R2 emitter rule: exact Yeptris bytes
 type-sensitive canonical equality with the frozen Psych YAML, and stable
 reparse/re-emission. These rules and goldens are read from the same checked-out
 core as the corpus; no expectation is regenerated from the engine under test.
+
+CLI snapshots refuse external schema resources with `UNSUPPORTED_CAPABILITY`,
+including Windows file URIs, relative host paths and HTTP resources.
 
 The remaining 149 rows are listed with reasons: shell detection (17), lint
 (70), and register-model snapshots (62). The pinned WASM rejects filesystem
