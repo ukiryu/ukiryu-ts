@@ -145,7 +145,7 @@ including Windows file URIs, relative host paths and HTTP resources.
 Lint replays inline YAML or manifest-verified fixture text through
 `engine.request('lint', { method: 'string', yaml })`, retaining Symbol keys,
 issue order, counts and complete diagnostic messages. Shell detection uses
-`engine.resolve({ method: 'shell_detect', platform: 'linux', env })` with
+`engine.request('resolve', { method: 'shell_detect', platform: 'linux', env })` with
 each row's complete environment, including null unsets. Node and browsers
 replay the same frozen Unix sandbox without reading the host environment.
 Ten shell rows follow the existing D2 decisions in the pinned core's

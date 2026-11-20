@@ -60,7 +60,7 @@ export function lintShellReplay({ engine, api, readInput, loadRule, digest }) {
       group: op,
       // Frozen rows describe a Unix sandbox. Never inspect Node's or the
       // browser's environment, and never overlay it onto these inputs.
-      call: () => engine.resolve({ method: 'shell_detect', platform: 'linux', env: decode(input.get('env')) }),
+      call: () => decode(engine.request('resolve', { method: 'shell_detect', platform: 'linux', env: decode(input.get('env')) })),
       mismatch: (have, frozen, detail) => {
         if (!jsonEqual(have, rule?.get('expect') ?? frozen)) return 'shell detection outcome differs';
         if (rule?.has('detail') && !jsonEqual(detail, rule.get('detail'))) return 'shell detection error detail differs';
