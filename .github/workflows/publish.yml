@@ -1,0 +1,124 @@
+name: npm trusted publishing
+
+# PRs only prepare a candidate. Tags and an explicit manual publish request
+# can publish once the owner removes private:true and configures npm OIDC.
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the owner-approved release (false prepares a dry run)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Verify npm release candidate (dry run)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: package
+      - uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu-rs
+          ref: main
+          path: core
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package/package-lock.json
+      - name: Require an OIDC-capable npm CLI
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from "node:child_process";
+          const v = execFileSync("npm", ["--version"], {encoding: "utf8"}).trim();
+          const [major, minor, patch] = v.split(".").map(Number);
+          if (!(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)))))
+            throw new Error(`npm >=11.5.1 required; found ${v}`);
+          JS
+      - name: Verify engine provenance and release-train membership
+        working-directory: package
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          PUBLISH: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+        run: |
+          pin=$(python3 -c 'import json; print(json.load(open("vendor/core-pin.json"))["commit"])')
+          python3 scripts/verify-vendor.py vendor --core ../core --commit "$pin" --track HEAD
+          args=()
+          if [ "$PUBLISH" = true ]; then args+=(--publish); fi
+          python3 scripts/prepare-npm-release.py --core ../core --ref "$RELEASE_REF" \
+            --output "$RUNNER_TEMP/npm-release" "${args[@]}"
+      - run: npm ci
+        working-directory: package
+      - run: npm run build
+        working-directory: package
+      - name: Committed distribution matches sources
+        working-directory: package
+        run: |
+          git diff --exit-code -- dist
+          test -z "$(git ls-files --others --exclude-standard -- dist)"
+      - name: Pack, verify and dry-run the exact tarball
+        working-directory: package
+        run: |
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/npm-release" --json > "$RUNNER_TEMP/pack.json"
+          python3 scripts/verify-pack.py "$RUNNER_TEMP"/npm-release/*.tgz --package-dir .
+          npm publish "$RUNNER_TEMP"/npm-release/*.tgz --dry-run --ignore-scripts --access public
+          cd "$RUNNER_TEMP/npm-release"
+          sha256sum ./*.tgz > SHA256SUMS
+      - name: Install the candidate in a clean project
+        run: |
+          mkdir "$RUNNER_TEMP/npm-smoke"
+          cd "$RUNNER_TEMP/npm-smoke"
+          npm init -y >/dev/null
+          npm install --ignore-scripts "$RUNNER_TEMP"/npm-release/*.tgz
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          const {name} = JSON.parse(readFileSync(process.env.GITHUB_WORKSPACE + "/package/package.json"));
+          const m = await import(name);
+          if (!await m.load()) throw new Error("engine did not load");
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-release-candidate
+          path: ${{ runner.temp }}/npm-release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the verified tarball with OIDC
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')
+    needs: candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-release-candidate
+          path: candidate
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Publish with provenance (trusted publishing only)
+        working-directory: candidate
+        run: |
+          sha256sum --check SHA256SUMS
+          npm publish ./*.tgz --access public --provenance --ignore-scripts

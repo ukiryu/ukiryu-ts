@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "artifact": "npm-package",
+  "repository": "ukiryu/ukiryu-ts",
+  "workflow": "publish.yml",
+  "environment": "npm",
+  "train_repository": "ukiryu/ukiryu-rs",
+  "train_ref": "main",
+  "train_inventory": "release/train.json",
+  "train_workflow": ".github/workflows/release-train.yml",
+  "engine_pin": "vendor/core-pin.json"
+}
