@@ -1,4 +1,5 @@
 import { yamlReplay } from './yaml.mjs';
+import { lintShellReplay, portableShellApplicability } from './lint-shell.mjs';
 import { cliSnapshot, renderCli, portableCliApplicability } from './cli-snapshot.mjs';
 // The conformance corpus through the package's public API, in Node or a
 // browser. This file maps corpus rows to API calls and compares results with
@@ -24,6 +25,8 @@ export const DISPATCHED = {
   'resolve.extract_version': 372,
   'resolve.range': 68,
   'resolve.version_spec': 130,
+  'resolve.shell_detect': 17,
+  'lint.string': 70,
   'type.validate': 60,
   'schema.validate_profile': 135,
   'schema.definition_validate': 58,
@@ -31,8 +34,6 @@ export const DISPATCHED = {
 
 /** Rows that cannot run on the portable surface of the pinned core, and why. */
 export const NOT_DISPATCHED = {
-  'resolve.shell_detect': [17, 'host shell detection is not mapped by this portable runner'],
-  'lint.string': [70, 'linting belongs to another card'],
   'yaml.model_load': [62, 'the pinned WASM model_load reads files; register-model snapshots need a core text-input API'],
 };
 
@@ -130,7 +131,11 @@ export async function runCorpus({ engine, api, load, loadRule, digest }) {
   };
   let cliContext;
   const yamlRequest = yamlReplay({ engine, api, readInput, loadRule, digest });
-  const request = async (op, input, id) => {
+  const lintShellRequest = lintShellReplay({ engine, api, readInput, loadRule, digest });
+  const request = async (row) => {
+    const op = get(row, 'op');
+    const input = get(row, 'input');
+    const id = get(row, 'id');
     if (op === 'yaml.load' || op === 'yaml.lutaml_roundtrip') return yamlRequest(op, input, id);
     if (op === 'cli.run') {
       cliContext ??= await cliSnapshot(inputDigests.keys(), readInput);
@@ -157,6 +162,9 @@ export async function runCorpus({ engine, api, load, loadRule, digest }) {
       case 'resolve.extract_version':
       case 'resolve.range':
         return { group: op, call: () => engine.resolve({ method: op.slice(8), ...plain(input) }) };
+      case 'resolve.shell_detect':
+      case 'lint.string':
+        return lintShellRequest(row);
       case 'resolve.version_spec': {
         const { tool, implementation, version } = plain(input);
         const path = `register/tools/${tool}/index.yaml`;
@@ -202,13 +210,13 @@ export async function runCorpus({ engine, api, load, loadRule, digest }) {
   };
   const outcome = (call) => {
     try {
-      return new Map([['ok', encode(call())]]);
+      return { value: new Map([['ok', encode(call())]]), detail: null };
     } catch (error) {
       if (!(error instanceof UkiryuError)) throw error;
-      if (error.sourceClass === null) return new Map([['wire_error', error.detail]]);
-      return new Map([
+      if (error.sourceClass === null) return { value: new Map([['wire_error', error.detail]]), detail: null };
+      return { value: new Map([
         ['error', new Map([['class', error.sourceClass], ['message', error.message]])],
-      ]);
+      ]), detail: error.detail.get('detail') ?? null };
     }
   };
 
@@ -219,7 +227,7 @@ export async function runCorpus({ engine, api, load, loadRule, digest }) {
     const id = get(row, 'id');
     const op = get(row, 'op');
     const applicability = get(row, 'applicability');
-    const job = await request(op, get(row, 'input'), id);
+    const job = await request(row);
     if (!job) {
       if (!Object.hasOwn(NOT_DISPATCHED, op)) fail(`${id}: operation ${op} is neither dispatched nor listed as not dispatched`);
       skipped[op] = (skipped[op] ?? 0) + 1;
@@ -227,14 +235,15 @@ export async function runCorpus({ engine, api, load, loadRule, digest }) {
     }
     const platforms = get(applicability, 'platforms');
     if (!portableCliApplicability(op, get(row, 'kind'), platforms, get(applicability, 'requires'))
+      && !portableShellApplicability(op, get(row, 'kind'), platforms, get(applicability, 'requires'))
       && (get(applicability, 'requires').length !== 0 || platforms.length !== 3)) {
       fail(`${id}: a dispatched row must apply everywhere without requirements`);
     }
     dispatched[job.group] = (dispatched[job.group] ?? 0) + 1;
     if (job.shell !== undefined) shells.set(job.shell, (shells.get(job.shell) ?? 0) + 1);
-    const have = outcome(job.call);
+    const { value: have, detail } = outcome(job.call);
     const want = get(row, 'expect');
-    const mismatch = job.mismatch ? await job.mismatch(have, want) : (jsonEqual(have, want) ? null : 'outcome differs');
+    const mismatch = job.mismatch ? await job.mismatch(have, want, detail) : (jsonEqual(have, want) ? null : 'outcome differs');
     if (mismatch) problems.push(`${id}: ${mismatch}\n  got  ${stringifyJson(have)}\n  want ${stringifyJson(want)}`);
   }
 

@@ -126,9 +126,10 @@ row the portable engine can answer with the Ruby library's recorded result.
 Rows that need a file, a process or the host are counted and listed with the
 reason in `test/conformance/corpus.mjs`.
 
-Both CI runners enforce 14,028 dispatched rows with fixed per-operation
+Both CI runners enforce 14,115 dispatched rows with fixed per-operation
 counts: build, escape, resolve, validate, the 21 deterministic CLI captures,
-81 safe YAML loads and 2 model YAML roundtrips. YAML parsing and emission use
+81 safe YAML loads, 2 model YAML roundtrips, 70 lint results and 17 shell
+detections. YAML parsing and emission use
 `engine.request('yaml', { method: 'safe_load' | 'model_to_yaml', ... })`;
 the lossless codec preserves Ruby scalar types.
 
@@ -141,8 +142,18 @@ core as the corpus; no expectation is regenerated from the engine under test.
 CLI snapshots refuse external schema resources with `UNSUPPORTED_CAPABILITY`,
 including Windows file URIs, relative host paths and HTTP resources.
 
-The remaining 149 rows are listed with reasons: shell detection (17), lint
-(70), and register-model snapshots (62). The pinned WASM rejects filesystem
+Lint replays inline YAML or manifest-verified fixture text through
+`engine.request('lint', { method: 'string', yaml })`, retaining Symbol keys,
+issue order, counts and complete diagnostic messages. Shell detection uses
+`engine.request('resolve', { method: 'shell_detect', platform: 'linux', env })` with
+each row's complete environment, including null unsets. Node and browsers
+replay the same frozen Unix sandbox without reading the host environment.
+Ten shell rows follow the existing D2 decisions in the pinned core's
+`ukiryu/tests/conformance/migrated.json`. Replay checks the governing issue
+trace, frozen Ruby expectation hash, exact replacement outcome, and structured
+error code, variant and stage. The frozen corpus is unchanged.
+
+The remaining 62 rows are register-model snapshots. The pinned WASM rejects filesystem
 `model_load`; replaying those snapshots needs a core text-input operation for
 `Interface`, `ImplementationVersion` and `ImplementationIndex`. `model_read`
 does not support these register classes. Corpus expectations are unchanged.
