@@ -16,7 +16,7 @@
     "package.json": "1e9dd56885453ad6a0aaa6bbfb6256c1fb5a8b5e9a8d5445a80b406b53c9ff78",
     "ukiryu.d.ts": "a20ec1ebef95bafaff0a8d3153eac0b0f22db83b54a69e9f197824ffe65c20d6",
     "ukiryu.js": "459367718e0e2744e20dab959f16abd51abc86bc83e224a444bce4e438bbc623",
-    "ukiryu_bg.wasm": "f90c708912304e792a8b13e83751350228cdc548aee707c744b7ff2101d3f708",
+    "ukiryu_bg.wasm": "0cd72d0035fe7ce74ec5b3d0cd7b4826325fc1a297e69d54fe427f5971771adb",
     "ukiryu_bg.wasm.d.ts": "86c5aeb1b555128d8f742d8118695374d0f5b564fc35a7b59c7890d3119ccc71"
   }
 }
