@@ -15,7 +15,7 @@ export const emscripten_builtin_malloc: (a: number) => number;
 export const emscripten_memcpy_js: (a: number, b: number, c: number) => void;
 export const getenv: (a: number) => number;
 export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_free_command_export: (a: number, b: number, c: number) => void;
 export const __wbindgen_malloc_command_export: (a: number, b: number) => number;
 export const __wbindgen_realloc_command_export: (a: number, b: number, c: number, d: number) => number;
-export const __wbindgen_free_command_export: (a: number, b: number, c: number) => void;
 export const __wbindgen_start: () => void;

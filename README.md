@@ -124,7 +124,7 @@ row the portable engine can answer with the Ruby library's recorded result.
 Rows that need a file, a process or the host are counted and listed with the
 reason in `test/conformance/corpus.mjs`.
 
-Both CI runners enforce 13,924 dispatched rows, including build, escape,
+Both CI runners enforce 13,945 dispatched rows, including build, escape,
 resolve and validate, with fixed per-operation counts. The 21 `cli.run`
 rows remain blocked: the pinned WASM exposes no portable CLI renderer and
 rejects `cli` and `cli.run` with `UNSUPPORTED_CAPABILITY`. Node's spawn hook
@@ -136,3 +136,21 @@ CI fails if `dist/` differs from a fresh build.
 
 BSD-2-Clause. The engine includes Onigmo; its notices are in
 `vendor/*/licenses/onigmo`.
+
+Deterministic CLI output uses `engine.request('cli.run', { argv, platform,
+env, snapshot })`. `snapshot.files` maps virtual paths to input text;
+`executables`, `probes` and `definitions` explicitly describe discovery facts
+(empty means none). The environment is complete, never an overlay on the host.
+The same parser and formatters serve the native CLI and WASM. Execution, writes,
+register bootstrap/update and unsupported discovery commands refuse with
+`UNSUPPORTED_CAPABILITY`; this entrypoint never opens host paths or spawns.
+The 21 frozen Linux CLI captures run on both hosts using this explicit snapshot.
+
+For a local vendor refresh, check out the exact clean commit in
+`vendor/core-pin.json`, put its pinned Rust/wasm-pack/Emscripten tools on PATH,
+then run `bash scripts/refresh-vendor.sh /path/to/ukiryu-rs`. It performs the
+same builds, license staging, source-derived BUILT_FROM stamping and verification
+as the vendor workflow; it refuses dirty or incorrectly pinned source/toolchains.
+
+To replay just these 21 rows locally, set `UKIRYU_CONFORMANCE_DIR` to the pinned
+core's `corpus/conformance` and run `npm run conformance:cli`.

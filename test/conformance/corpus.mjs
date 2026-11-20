@@ -1,3 +1,4 @@
+import { cliSnapshot, renderCli, portableCliApplicability } from './cli-snapshot.mjs';
 // The conformance corpus through the package's public API, in Node or a
 // browser. This file maps corpus rows to API calls and compares results with
 // the rows' expectations; every result comes from the core engine.
@@ -14,6 +15,7 @@
 
 /** Rows dispatched through the portable API, per corpus operation. */
 export const DISPATCHED = {
+  'cli.run': 21,
   'build.args': 485,
   'shell.*': 12616,
   'resolve.extract_version': 372,
@@ -26,7 +28,6 @@ export const DISPATCHED = {
 
 /** Rows that cannot run on the portable surface of the pinned core, and why. */
 export const NOT_DISPATCHED = {
-  'cli.run': [21, 'the pinned WASM has no CLI rendering operation (cli/cli.run reject UNSUPPORTED_CAPABILITY); needs a portable core renderer'],
   'resolve.shell_detect': [17, 'detects the host shell (owner decision D2 is open; the wire has no shell detection)'],
   'lint.string': [70, 'linting belongs to another card'],
   'yaml.load': [81, 'YAML loading belongs to another card'],
@@ -125,7 +126,12 @@ export async function runCorpus({ engine, api, load, digest }) {
     }
     return interfaces;
   };
+  let cliContext;
   const request = async (op, input) => {
+    if (op === 'cli.run') {
+      cliContext ??= await cliSnapshot(inputDigests.keys(), readInput);
+      return { group: op, call: () => renderCli(engine, plain(input).argv, cliContext) };
+    }
     if (op.startsWith('shell.')) {
       const fields = plain(input);
       const { shell, ...operation } = fields;
@@ -216,7 +222,8 @@ export async function runCorpus({ engine, api, load, digest }) {
       continue;
     }
     const platforms = get(applicability, 'platforms');
-    if (get(applicability, 'requires').length !== 0 || platforms.length !== 3) {
+    if (!portableCliApplicability(op, get(row, 'kind'), platforms, get(applicability, 'requires'))
+      && (get(applicability, 'requires').length !== 0 || platforms.length !== 3)) {
       fail(`${id}: a dispatched row must apply everywhere without requirements`);
     }
     dispatched[job.group] = (dispatched[job.group] ?? 0) + 1;
@@ -300,7 +307,7 @@ export async function runCorpus({ engine, api, load, digest }) {
     control(`malformed ${JSON.stringify(operation)}`, () => raises(() => engine.escape('bash', operation), 'INVALID_REQUEST'));
   }
   // Operations outside the WebAssembly allowlist stay unavailable.
-  for (const op of ['execute', 'results', 'cli', 'cli.run']) {
+  for (const op of ['execute', 'results', 'cli']) {
     control(`capability ${op}`, () => raises(() => engine.request(op, {}), 'UNSUPPORTED_CAPABILITY'));
   }
   // A shell given as a path resolves by its basename.
