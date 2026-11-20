@@ -108,7 +108,7 @@ test('CLI snapshots refuse external schema resources on every host', () => {
       executables: {}, probes: [], definitions: [],
     },
   });
-  assert.ok(request('type: object\n').has('exit_code'));
+  assert.ok(request('type: object\n').has('exit'));
   for (const reference of [
     String.raw`file://D:\a\ukiryu-rs\ukiryu-rs\ukiryu/Cargo.toml`,
     'file:///C:/host/Cargo.toml',
