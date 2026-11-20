@@ -1,11 +1,11 @@
 /**
  * The runtime over one core engine.
  *
- * Every operation is one request to the core's `process` export: the request
+ * Every portable operation is one request to the core's `process` export: the request
  * is encoded with the lossless codec, the core does all of the work, and the
- * reply is decoded back into typed values. This module adds no behaviour of
- * its own: no tool loading, YAML, escaping, version matching or validation
- * happens in TypeScript.
+ * reply is decoded back into typed values. Tool loading, YAML, escaping,
+ * version matching and validation stay in the core. Execution delegates the
+ * built argv to an optional host adapter.
  *
  * The engine is portable: it has no filesystem, environment, clock or
  * subprocess. Tool definitions, version indexes, profiles and schemas are
@@ -148,6 +148,41 @@ export interface BuildResult {
   command_name: string;
 }
 
+/** A direct invocation. The core has already built argv for this shell/profile. */
+export interface SpawnRequest {
+  argv: readonly [string, ...string[]];
+  shell: Shell;
+  env: Readonly<Record<string, string>>;
+  cwd?: string;
+  stdin: string | Uint8Array | null;
+  /** Seconds; zero means no deadline. */
+  timeout: number;
+}
+
+/** Raw host output; no decoding, command-result parsing or failure policy. */
+export interface SpawnResult {
+  stdout: Uint8Array;
+  stderr: Uint8Array;
+  exitStatus: number | null;
+  signal: string | null;
+  timedOut: boolean;
+}
+
+/** Hosts may provide execution; browser engines have no adapter by default. */
+export interface Spawner {
+  spawn(request: SpawnRequest): Promise<SpawnResult>;
+}
+
+export interface ExecuteOptions {
+  /** Required when the portable core returns executable: null. No PATH discovery is emulated. */
+  executable?: string;
+  env?: Readonly<Record<string, string>>;
+  cwd?: string;
+  stdin?: string | Uint8Array | null;
+  /** Seconds; defaults to zero (no deadline). */
+  timeout?: number;
+}
+
 /** `ValidationResult#to_h` plus how the schema stage was resolved. */
 export interface DefinitionReport {
   valid: boolean;
@@ -185,21 +220,23 @@ function check<T>(ok: boolean, value: T, what: string): T {
 
 export class Ukiryu {
   readonly #binding: CoreBinding;
+  readonly #spawner?: Spawner;
   /** The core's crate version. */
   readonly coreVersion: string;
 
-  private constructor(binding: CoreBinding) {
+  private constructor(binding: CoreBinding, spawner?: Spawner) {
     this.#binding = binding;
+    this.#spawner = spawner;
     this.coreVersion = binding.core_version();
   }
 
   /** Wrap an initialized core engine, refusing one that speaks another ABI. */
-  static fromBinding(binding: CoreBinding): Ukiryu {
+  static fromBinding(binding: CoreBinding, spawner?: Spawner): Ukiryu {
     const abi = binding.abi_version();
     if (abi !== ABI_VERSION) {
       throw new Error(`the core engine speaks wire ABI ${abi}; this runtime speaks ABI ${ABI_VERSION}`);
     }
-    return new Ukiryu(binding);
+    return new Ukiryu(binding, spawner);
   }
 
   /**
@@ -256,6 +293,38 @@ export class Ukiryu {
       ),
       command_name: check(typeof commandName === 'string', commandName as string, 'build.command_name'),
     };
+  }
+
+  /** Build in the core, then run the resulting argv through the host adapter. */
+  async execute(request: BuildRequest, options: ExecuteOptions = {}): Promise<SpawnResult> {
+    if (!this.#spawner) {
+      throw new UkiryuError(new Map([
+        ['code', 'UNSUPPORTED_CAPABILITY'],
+        ['message', 'Execution requires a Spawner; the browser entry provides none'],
+      ]));
+    }
+    const timeout = options.timeout ?? 0;
+    if (!Number.isFinite(timeout) || timeout < 0 || timeout * 1000 > 2147483647) {
+      throw new RangeError('timeout must be finite, non-negative seconds within the host timer range');
+    }
+    const built = this.build(request);
+    const executable = options.executable ?? built.executable;
+    if (!executable) {
+      throw new UkiryuError(new Map([
+        ['code', 'EXECUTABLE_REQUIRED'],
+        ['message', 'The portable core cannot discover executables; pass options.executable'],
+      ]));
+    }
+    const identity = record(this.resolve({ method: 'tool', ...request.tool }), 'resolve tool');
+    const shell = member(identity, 'shell', 'resolve tool');
+    return this.#spawner.spawn({
+      argv: [executable, ...built.args],
+      shell: check(typeof shell === 'string', shell as string, 'resolve tool.shell'),
+      env: { ...Object.fromEntries(built.env), ...options.env },
+      cwd: options.cwd,
+      stdin: options.stdin === undefined ? built.stdin : options.stdin,
+      timeout,
+    });
   }
 
   /**

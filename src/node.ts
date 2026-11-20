@@ -4,8 +4,10 @@
  */
 import { createRequire } from 'node:module';
 import { type CoreBinding, Ukiryu } from './engine.js';
+import { nodeSpawner } from './spawn.js';
 
 export * from './index.js';
+export { nodeSpawner } from './spawn.js';
 
 let engine: Ukiryu | undefined;
 
@@ -13,7 +15,7 @@ let engine: Ukiryu | undefined;
 export async function load(): Promise<Ukiryu> {
   if (!engine) {
     const require = createRequire(import.meta.url);
-    engine = Ukiryu.fromBinding(require('../vendor/ukiryu-wasm/ukiryu.js') as CoreBinding);
+    engine = Ukiryu.fromBinding(require('../vendor/ukiryu-wasm/ukiryu.js') as CoreBinding, nodeSpawner);
   }
   return engine;
 }

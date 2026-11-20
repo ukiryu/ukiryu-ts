@@ -4,13 +4,15 @@
  */
 import { createRequire } from 'node:module';
 import { Ukiryu } from './engine.js';
+import { nodeSpawner } from './spawn.js';
 export * from './index.js';
+export { nodeSpawner } from './spawn.js';
 let engine;
 /** The engine, loaded once per process. */
 export async function load() {
     if (!engine) {
         const require = createRequire(import.meta.url);
-        engine = Ukiryu.fromBinding(require('../vendor/ukiryu-wasm/ukiryu.js'));
+        engine = Ukiryu.fromBinding(require('../vendor/ukiryu-wasm/ukiryu.js'), nodeSpawner);
     }
     return engine;
 }

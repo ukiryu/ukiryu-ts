@@ -1,11 +1,11 @@
 /**
  * The runtime over one core engine.
  *
- * Every operation is one request to the core's `process` export: the request
+ * Every portable operation is one request to the core's `process` export: the request
  * is encoded with the lossless codec, the core does all of the work, and the
- * reply is decoded back into typed values. This module adds no behaviour of
- * its own: no tool loading, YAML, escaping, version matching or validation
- * happens in TypeScript.
+ * reply is decoded back into typed values. Tool loading, YAML, escaping,
+ * version matching and validation stay in the core. Execution delegates the
+ * built argv to an optional host adapter.
  *
  * The engine is portable: it has no filesystem, environment, clock or
  * subprocess. Tool definitions, version indexes, profiles and schemas are
@@ -164,6 +164,37 @@ export interface BuildResult {
     stdin: string | Uint8Array | null;
     command_name: string;
 }
+/** A direct invocation. The core has already built argv for this shell/profile. */
+export interface SpawnRequest {
+    argv: readonly [string, ...string[]];
+    shell: Shell;
+    env: Readonly<Record<string, string>>;
+    cwd?: string;
+    stdin: string | Uint8Array | null;
+    /** Seconds; zero means no deadline. */
+    timeout: number;
+}
+/** Raw host output; no decoding, command-result parsing or failure policy. */
+export interface SpawnResult {
+    stdout: Uint8Array;
+    stderr: Uint8Array;
+    exitStatus: number | null;
+    signal: string | null;
+    timedOut: boolean;
+}
+/** Hosts may provide execution; browser engines have no adapter by default. */
+export interface Spawner {
+    spawn(request: SpawnRequest): Promise<SpawnResult>;
+}
+export interface ExecuteOptions {
+    /** Required when the portable core returns executable: null. No PATH discovery is emulated. */
+    executable?: string;
+    env?: Readonly<Record<string, string>>;
+    cwd?: string;
+    stdin?: string | Uint8Array | null;
+    /** Seconds; defaults to zero (no deadline). */
+    timeout?: number;
+}
 /** `ValidationResult#to_h` plus how the schema stage was resolved. */
 export interface DefinitionReport {
     valid: boolean;
@@ -180,7 +211,7 @@ export declare class Ukiryu {
     readonly coreVersion: string;
     private constructor();
     /** Wrap an initialized core engine, refusing one that speaks another ABI. */
-    static fromBinding(binding: CoreBinding): Ukiryu;
+    static fromBinding(binding: CoreBinding, spawner?: Spawner): Ukiryu;
     /**
      * Send one wire request and return the reply's `value`. The request is
      * encoded losslessly; fields set to `undefined` are left out.
@@ -199,6 +230,8 @@ export declare class Ukiryu {
     resolve(request: ResolveRequest): RubyValue;
     /** Build a command's argv, environment and stdin without executing it. */
     build(request: BuildRequest): BuildResult;
+    /** Build in the core, then run the resulting argv through the host adapter. */
+    execute(request: BuildRequest, options?: ExecuteOptions): Promise<SpawnResult>;
     /**
      * `Ukiryu::Type.validate(value, type, options)` (the coerced value), or a
      * tool definition's validation report.

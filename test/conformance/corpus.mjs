@@ -26,7 +26,7 @@ export const DISPATCHED = {
 
 /** Rows that cannot run on the portable surface of the pinned core, and why. */
 export const NOT_DISPATCHED = {
-  'cli.run': [21, 'runs the ukiryu command-line program as a process'],
+  'cli.run': [21, 'the pinned WASM has no CLI rendering operation (cli/cli.run reject UNSUPPORTED_CAPABILITY); needs a portable core renderer'],
   'resolve.shell_detect': [17, 'detects the host shell (owner decision D2 is open; the wire has no shell detection)'],
   'lint.string': [70, 'linting belongs to another card'],
   'yaml.load': [81, 'YAML loading belongs to another card'],
@@ -300,7 +300,7 @@ export async function runCorpus({ engine, api, load, digest }) {
     control(`malformed ${JSON.stringify(operation)}`, () => raises(() => engine.escape('bash', operation), 'INVALID_REQUEST'));
   }
   // Operations outside the WebAssembly allowlist stay unavailable.
-  for (const op of ['execute', 'results']) {
+  for (const op of ['execute', 'results', 'cli', 'cli.run']) {
     control(`capability ${op}`, () => raises(() => engine.request(op, {}), 'UNSUPPORTED_CAPABILITY'));
   }
   // A shell given as a path resolves by its basename.
