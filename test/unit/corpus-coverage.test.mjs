@@ -6,14 +6,15 @@ import { DISPATCHED, NOT_DISPATCHED, TOTAL } from '../conformance/corpus.mjs';
 
 test('portable corpus groups have fixed executed counts checked by both CI runners', () => {
   assert.deepEqual(DISPATCHED, {
+    'yaml.load': 81, 'yaml.lutaml_roundtrip': 2,
     'cli.run': 21, 'build.args': 485, 'shell.*': 12616, 'resolve.extract_version': 372,
     'resolve.range': 68, 'resolve.version_spec': 130, 'type.validate': 60,
     'schema.validate_profile': 135, 'schema.definition_validate': 58,
   });
   const dispatched = Object.values(DISPATCHED).reduce((a, b) => a + b, 0);
-  assert.equal(dispatched, 13945);
+  assert.equal(dispatched, 14028);
   assert.equal(dispatched + Object.values(NOT_DISPATCHED).reduce((n, [count]) => n + count, 0), TOTAL);
-  assert.equal(NOT_DISPATCHED['cli.run'], undefined);
+  assert.deepEqual(Object.keys(NOT_DISPATCHED).sort(), ['lint.string', 'resolve.shell_detect', 'yaml.model_load']);
 });
 
 test('portable CLI requires an explicit snapshot and retains native capability refusals', async () => {

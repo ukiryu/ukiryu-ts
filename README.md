@@ -124,11 +124,23 @@ row the portable engine can answer with the Ruby library's recorded result.
 Rows that need a file, a process or the host are counted and listed with the
 reason in `test/conformance/corpus.mjs`.
 
-Both CI runners enforce 13,945 dispatched rows, including build, escape,
-resolve and validate, with fixed per-operation counts. The 21 `cli.run`
-rows remain blocked: the pinned WASM exposes no portable CLI renderer and
-rejects `cli` and `cli.run` with `UNSUPPORTED_CAPABILITY`. Node's spawn hook
-does not supply the Ukiryu CLI binary. Corpus expectations are unchanged.
+Both CI runners enforce 14,028 dispatched rows with fixed per-operation
+counts: build, escape, resolve, validate, the 21 deterministic CLI captures,
+81 safe YAML loads and 2 model YAML roundtrips. YAML parsing and emission use
+`engine.request('yaml', { method: 'safe_load' | 'model_to_yaml', ... })`;
+the lossless codec preserves Ruby scalar types.
+
+Roundtrips follow the pinned core's R2 emitter rule: exact Yeptris bytes
+(verified against the SHA-256 in `ukiryu/tests/conformance/emitter.json`),
+type-sensitive canonical equality with the frozen Psych YAML, and stable
+reparse/re-emission. These rules and goldens are read from the same checked-out
+core as the corpus; no expectation is regenerated from the engine under test.
+
+The remaining 149 rows are listed with reasons: shell detection (17), lint
+(70), and register-model snapshots (62). The pinned WASM rejects filesystem
+`model_load`; replaying those snapshots needs a core text-input operation for
+`Interface`, `ImplementationVersion` and `ImplementationIndex`. `model_read`
+does not support these register classes. Corpus expectations are unchanged.
 
 CI fails if `dist/` differs from a fresh build.
 
