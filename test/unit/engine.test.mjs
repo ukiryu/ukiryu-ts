@@ -99,6 +99,34 @@ test('validate definition_text runs the supplied schema stage', () => {
   assert.equal(skipped.schema_stage.get('kind'), 'supplied_not_loaded');
 });
 
+test('CLI snapshots refuse external schema resources on every host', () => {
+  const request = (schema) => engine.request('cli.run', {
+    argv: ['validate', 'file', '/profile.yaml', '--schema', '/schema.yaml'],
+    platform: 'linux', env: {},
+    snapshot: {
+      files: { '/profile.yaml': DEFINITION, '/schema.yaml': schema },
+      executables: {}, probes: [], definitions: [],
+    },
+  });
+  assert.ok(request('type: object\n').has('exit_code'));
+  for (const reference of [
+    String.raw`file://D:\a\ukiryu-rs\ukiryu-rs\ukiryu/Cargo.toml`,
+    'file:///C:/host/Cargo.toml',
+    'file://localhost/C:/host/Cargo.toml',
+    String.raw`C:\host\Cargo.toml`,
+    String.raw`\\server\share\Cargo.toml`,
+    'file:///host/Cargo.toml',
+    '../host/Cargo.toml',
+    'https://example.invalid/schema.json',
+  ]) {
+    assert.throws(
+      () => request(`$ref: ${reference}\n`),
+      (error) => error instanceof UkiryuError && error.code === 'UNSUPPORTED_CAPABILITY',
+      reference,
+    );
+  }
+});
+
 test('Hash key order survives the engine reply', () => {
   const value = engine.validate({ method: 'type', value: new Map([['zeta', 1n], ['alpha', 2n], ['mid', 3n]]), type: RubySymbol.for('hash') });
   assert.deepEqual([...value.keys()], ['zeta', 'alpha', 'mid']);

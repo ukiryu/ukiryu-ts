@@ -125,10 +125,10 @@ Rows that need a file, a process or the host are counted and listed with the
 reason in `test/conformance/corpus.mjs`.
 
 Both CI runners enforce 13,945 dispatched rows, including build, escape,
-resolve and validate, with fixed per-operation counts. The 21 `cli.run`
-rows remain blocked: the pinned WASM exposes no portable CLI renderer and
-rejects `cli` and `cli.run` with `UNSUPPORTED_CAPABILITY`. Node's spawn hook
-does not supply the Ukiryu CLI binary. Corpus expectations are unchanged.
+resolve, validate and all 21 deterministic `cli.run` rows, with fixed
+per-operation counts. CLI snapshots refuse external schema resources with
+`UNSUPPORTED_CAPABILITY`, including Windows file URIs, relative host paths
+and HTTP resources. Corpus expectations are unchanged.
 
 CI fails if `dist/` differs from a fresh build.
 
